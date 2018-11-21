@@ -29,7 +29,6 @@ class core:
     Bnum = (Bsize[0]//size[0]+1, Bsize[1]//size[1]+1)
 
 def init(MobTypes):
-    global core
     "MobTypes : tuple of all created class\nInitializing all class in tuple"
     files = listdir("textures")
     for a in MobTypes:
@@ -66,7 +65,6 @@ def init(MobTypes):
                     img.blit(imgs, (size[0]*c, 0))
                     a.img[b].append(pygame.transform.rotozoom(img, b*90, size))
                 b+=1
-    core.timexe = time()
 
 class Player:
     pos = Array("i", 2)
@@ -671,10 +669,19 @@ def Refresh():
     IA_D.clean()
     Entity.clean()
     # ----- SCREEN ----- #
-    x = (core.size[0] - Player.size[0])//2 - Player.pos[0]
-    y = (core.size[1] - Player.size[1])//2 - Player.pos[1]
+    x = int((core.size[0] - Player.size[0])//2 - Player.pos[0]+0.5)
+    y = int((core.size[1] - Player.size[1])//2 - Player.pos[1]+0.5)
+    X = x%Bsize[0]-Bsize[0]
+    Y = y%Bsize[1]-Bsize[1]
+    a=0
+    while a < core.Bnum[0]:
+        b=0
+        while b < core.Bnum[1]:
+            b+=1
+            core.fen.blit(core.img, (x+Bsize[0]*a, y+Bsize[1]*b))
+        a+=1
     for a in IA.entities:
-        fen.blit(IA.entities, (x+a.pos[0], y+a.pos[1]))
+        core.fen.blit(IA.entities, (x+a.pos[0], y+a.pos[1]))
     # ------------------ #
     core.tic+=1
     if core.tic == 120:
@@ -687,6 +694,9 @@ def Refresh():
     core.timexe += 0.05
     T = core.timexe - time()
     if T > 0:sleep(T)
+    elif T > 1:core.timexe=time()
+    for a in Fired.actives:
+        a.run()
     for a in Entity.actives:
         a.run()
     for a in IA.actives:
