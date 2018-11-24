@@ -6,6 +6,7 @@ all textures must be in "textures"
 name "background.png" your background image
 if one image couldn't be loaded, "default.bmp" was loaded instead
 Descriptions wasn't in french now. When released, all description will be in english.
+test.py is an example of program using my library.
 
 Usage :
 Use "from entitylib2 import * " for import this library, pygame (initialized) and randint.
