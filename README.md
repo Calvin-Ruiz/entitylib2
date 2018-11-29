@@ -1,15 +1,17 @@
 # entitylib2
 Library with optimized gestion of entities with pygame
 
-Notes :
-all textures must be in "textures"  
+Notes :  
+all textures must be in "textures", and all sound in "sounds"  
 name "background.png" your background image  
 if one image couldn't be loaded, "default.bmp" was loaded instead  
 Descriptions wasn't in french now. When released, all description will be in english.  
-"test.py" is an example of program using my library.
+"test.py" is an example of program using my library.  
+textures/letter and textures/letters is used for write text on pygame display.
 
-Usage :
-Use "from entitylib2 import * " for import this library, pygame (initialized) and randint.
+Usage :  
+Use "from entitylib2 import * " for import this library, pygame (initialized) and randint.  
+Initialize all your entities and entitylib2 that you're created with init()
 
-Warning : multiprocessing doesn't work in 3.7.1 !
-Use multiprocessing of python 3.5.2 instead
+Warning : multiprocessing doesn't work with python 3.7.1 !  
+multiprocessing work with python 3.5.2, and maybe with other version.
