@@ -1,14 +1,12 @@
 from random import randint
 from time import time, sleep
-from multiprocessing import Value, Array, Process
 try:
     import pygame
-    from os import listdir
 except:
     import os
     print("ImportError : Pygame wasn't installed !")
     print("Should I install pygame right now ?")
-    if input().upper() in ["OUI", "O", "YE", "YES", "INSTALL", "INSTALLER", "TRUE", "1", "CMD", "PIP", "OK"]:
+    if input().upper() in ["OUI", "O", "Y", "YES", "INSTALL", "INSTALLER", "TRUE", "1", "CMD", "PIP", "OK"]:
         print("Python folder detected in '"+os.__file__[0:-10]+"'")
         file = open("supprime_moi.bat", "w")
         file.write("cd /d "+os.__file__[0:-10]+"""
@@ -16,21 +14,114 @@ python -m pip install --upgrade pip
 python -m pip install pygame""")
         file.close()
         os.startfile("supprime_moi.bat")
-        input("Please, relaunch it after complete installation of pygame.")
+        input("Press <Entry> after complete installation of pygame")
+        import pygame
+
+try:
+    import numpy
+    from os import listdir
+except:
+    import os
+    print("ImportError : Numpy wasn't installed !\nFunctions 'save' and 'load' need numpy.")
+    print("Should I install pygame right now ?")
+    if input().upper() in ["OUI", "O", "Y", "YES", "INSTALL", "INSTALLER", "TRUE", "1", "CMD", "PIP", "OK"]:
+        print("Python folder detected in '"+os.__file__[0:-10]+"'")
+        file = open("supprime_moi.bat", "w")
+        file.write("cd /d "+os.__file__[0:-10]+"""
+python -m pip install --upgrade pip
+python -m pip install numpy""")
+        file.close()
+        os.startfile("supprime_moi.bat")
+        input("Press <Entry> after complete installation of numpy")
+        import numpy
 
 pygame.init()
-print("Warning : Refresh doesn't work with latest python version. (work with 3.5.2)")
-print("If Refresh doesn't work with your python version, use SRefresh instead")
-print("Released on https://github.com/Calvin-Ruiz/entitylib2")
+print("Hello from entitylib2 too        https://github.com/Calvin-Ruiz/entitylib2")
+
+def save(filename):
+    print("NotImplementedError : save hasn't been implemented yet.");return None
+    global Player, Obstacle, Fired, Entity, IA, IA_D
+    numpy.save("saves/"+filename, (Player.__dict__, Obstacle.entities, Fired.entities, Entity.entities, IA.entities, IA_D.entities))
+
+def load(filename):
+    "return True if save doesn't exist"
+    print("NotImplementedError : save hasn't been implemented yet.");return None
+    global core, Player, Obstacle, Fired, Entity, IA, IA_D
+    if filename in listdir("saves"):
+        N = numpy.load("saves/"+filename).tolist()
+        Player.__dict__, Obstacle.entities, Fired.entities, Entity.entities, IA.entities, IA_D.entities = N
+        return False
+    else:return True
 
 class BaseEntity:
+    def __repr__(self):
+        text = "--------- "+self.name+" ----------\nlive : "+str(self.live)+"\n--- effects ---\n"
+        for a in self.effect:text+=str(a)
+        return text+"---------------------"+"-"*len(self.name)
+    img_format=(1, "png")
+    live=20
+    atk_freq=20
+    atk_delay=0
+    Size=None
+    def chunking(self):
+        global core
+        "Test if entity exit chunk"
+        if self.pos[0] + self.Size[0] < 0:
+            # sortie à gauche
+            if self.chunk[0] > core.border[0]:
+                core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                self.chunk[0]-=1
+                core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
+                self.pos[0]+=256
+            else:
+                self.pos[0]=-self.Size[0]
+        elif self.pos[0] + self.Size[0] > 256:
+            # sortie à droite
+            if self.chunk[0] < core.border[1]:
+                core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                self.chunk[0]+=1
+                core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
+                self.pos[0]-=256
+            else:
+                self.pos[0]=256-self.Size[0]
+        if self.pos[1] + self.Size[1] < 0:
+            # sortie en haut
+            if self.chunk[1] > core.border[2]:
+                core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                self.chunk[1]-=1
+                core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
+                self.pos[1]+=256
+            else:
+                self.pos[1]=-self.Size[1]
+        elif self.pos[1] + self.Size[1] > 256:
+            # sortie en bas
+            if self.chunk[1] < core.border[3]:
+                core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                self.chunk[1]+=1
+                core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
+                self.pos[1]-=256
+            else:
+                self.pos[1]=256-self.Size[1]
     def apply(self, effect, delay, level):
+        for a in self.effect:
+            if a.name == effect.name:
+                if a.level >= level:
+                    a.delay=delay
+                    a.level=level
+                return None
         self.effect.append(effect(delay, level))
         self.effect[-1].init_effect(self)
     def apply_all(self, liste):
+        # deprecated
+        l=list()
+        for a in self.effect:
+            l.append(a.name)
         for a in liste:
             self.effect.append(a[0](a[1], a[2]))
             self.effect[-1].init_effect(self)
+    def apply_all(self, liste):
+        for e in liste:
+            self.apply(e[0], e[1], e[2])
 
 def write(text):
     global letters
@@ -74,13 +165,49 @@ def fullscreen():
     else:pygame.display.set_mode(core.size, pygame.FULLSCREEN)
     core.fmode = not core.fmode
 
+def screenshoot():
+    global core
+    t=int(time())
+    date = str(t%60) + "s"
+    t//=60
+    date = str(t%60) + "m" + date
+    t//=60
+    t+=2
+    date = str(t%24) + "h" + date
+    t//=24
+    date = str(t) + " on " + date
+    pygame.image.save(core.fen, "screenshoots/screenshoot of day " + date +".bmp")
+    print("screenshoot saved as 'screenshoot of day "+date+"'")
+
 class core:
     __doc__ = "Content all variables used on this library. Use with caution !"
     __init__ = None
+    area={"entity":[], "obs":[], "static":[]}
+    model = list()
+    while len(model) < 64:
+        model.append([])
+    model = str(tuple(model))
+    a=0
+    while a < 64:
+        area["entity"].append(eval(model))
+        a+=1
+    area["entity"] = tuple(area["entity"])
+    a=0
+    while a < 64:
+        area["obs"].append(eval(model))
+        a+=1
+    area["obs"] = tuple(area["obs"])
+    a=0
+    while a < 64:
+        area["static"].append(eval(model))
+        a+=1
+    area["static"] = tuple(area["static"])
     score=0
+    border = None
     fmode = False
-    size = None
+    size = None # fen size
     fen = None
+    S = None # chunk size
     tic=0 # reset when tic == 360
     timer=0 # nombre de 0,3 minutes écoulées depuis le début de la partie (si aucun lags)
     timexe = time()
@@ -96,16 +223,20 @@ class core:
     Bnum=None
 
 letters=dict()
+imgeff = dict()
 
 def init(MobTypes, fen_size=(1536, 1024)):
     "MobTypes : tuple of all created class\nInitializing all class in tuple"
-    global core, Fired, Player, letters
+    global core, Fired, Player, letters, imgeff
     print("Initialisation...")
-    core.size=fen_size
-    core.fen = pygame.display.set_mode(fen_size)
+    core.S=(fen_size[0]//256+1, fen_size[1]//256+1)
+    core.size = ((core.S[0]-1)*256, (core.S[1]-1)*256)
+    core.fen = pygame.display.set_mode(core.size)
     core.Bnum = (core.size[0]//core.Bsize[0]+2, core.size[1]//core.Bsize[1]+2)
+    core.border = (core.S[0]-2, 65-core.S[0], core.S[1]-2, 65-core.S[1])
     files = listdir("textures")
     for a in MobTypes + (Player,):
+        if max(a.size) > 128:print("Warning : maximal size is 128 and "+str(max(a.size))+" > 128")
         a.name = a.__name__
         if a.sound != None:a.sounded=True;a.sound=pygame.mixer.Sound("sounds/"+a.sound)
         if type(a.img_format) is str:
@@ -114,6 +245,7 @@ def init(MobTypes, fen_size=(1536, 1024)):
             else:
                 a.img = pygame.transform.scale(pygame.image.load("textures/default.bmp"), a.size)
             continue
+        a.Size = (a.size[0]//2, a.size[1]//2)
         try:
             imgs = pygame.image.load("textures/" + a.name + "."+a.img_format[-1])
         except:
@@ -122,15 +254,15 @@ def init(MobTypes, fen_size=(1536, 1024)):
         b=0
         size = imgs.get_size()
         if len(a.img_format) == 3:
-            size = (size[0]//img_format[0], size[1]//img_format[1])
+            size = (size[0]//a.img_format[0], size[1]//a.img_format[1])
             while b < a.img_format[1]:
                 c=0
                 a.img.append(list())
                 while c < a.img_format[0]:
                     c+=1
                     img=pygame.Surface(size, pygame.SRCALPHA, 32).convert_alpha()
-                    img.blit(imgs, (size[0]*c, size[1]*b))
-                    a.img[b].append(pygame.transform.scale(img, size))
+                    img.blit(imgs, ((c - a.img_format[0])*size[0], (1+b - a.img_format[1])*size[1]))
+                    a.img[b].append(pygame.transform.scale(img, a.size))
                 b+=1
         elif a.__class__ is Fired:
             c=0
@@ -147,13 +279,15 @@ def init(MobTypes, fen_size=(1536, 1024)):
                 while c < a.img_format[0]:
                     img=pygame.Surface(size, pygame.SRCALPHA, 32).convert_alpha()
                     img.blit(imgs, (-size[0]*c, 0))
-                    a.img[b].append(pygame.transform.scale(pygame.transform.rotate(img, b*90), a.size))
+                    a.img[b].append(pygame.transform.scale(pygame.transform.rotate(img, (4-b)*90), a.size))
                     c+=1
                 b+=1
     for image in listdir("textures/letter"):
         letters.__setitem__(image[0:-4], pygame.image.load("textures/letter/"+image))
     for image in listdir("textures/letters"):
         letters.__setitem__(image[0:-4], pygame.image.load("textures/letters/"+image))
+    for image in listdir("textures/effect"):
+        imgeff.__setitem__(image[0:-4], pygame.image.load("textures/effect/"+image))
     print("Librairie et entités initialisées")
 
 def NoWeapon(a, b):pass
@@ -166,163 +300,193 @@ Utiliser MyEffect = effect(*args) pour créer un nouvel effet."""
     def __init__(self):
         global Player
         self.effect=list()
-        self.pos = Array("f", self.pos, lock=False)
-        self.live = Value("i", self.live)
-        self.atk_delay = Value("i", 0, lock=False)
-        self.speed = Value("f", self.speed, lock=False)
-        self.react = Process(target=self.collide)
-        self.react.start()
-    pos = [0, 0]
+        self.atk_delay = 0
+    pos = [48, 48]
     move = [0, 0]
+    chunk = [31,31]
     size = (32, 32)
-    live = 100
+    live = 20
     dir = 0
     img = None
     atk_delay = 0
-    atk_freq = 0
+    atk_freq = 10
     weapon = NoWeapon
-    img_format=(1, "png")
     frame = 0
     speed = 3
     react = None
     sound = None
     sounded=False
-    effects = []
+    def chunking(self):
+        global core
+        "Test if entity exit chunk"
+        if self.pos[0] + self.Size[0] < 0:
+            # sortie à gauche
+            if self.chunk[0] > core.border[0]:
+                self.chunk[0]-=1
+                self.pos[0]+=256
+            else:
+                self.pos[0]=-self.Size[0]
+        elif self.pos[0] + self.Size[0] > 256:
+            # sortie à droite
+            if self.chunk[0] < core.border[1]:
+                self.chunk[0]+=1
+                self.pos[0]-=256
+            else:
+                self.pos[0]=256-self.Size[0]
+        if self.pos[1] + self.Size[1] < 0:
+            # sortie en haut
+            if self.chunk[1] > core.border[2]:
+                self.chunk[1]-=1
+                self.pos[1]+=256
+            else:
+                self.pos[1]=-self.Size[1]
+        elif self.pos[1] + self.Size[1] > 256:
+            # sortie en bas
+            if self.chunk[1] < core.border[3]:
+                self.chunk[1]+=1
+                self.pos[1]-=256
+            else:
+                self.pos[1]=256-self.Size[0]
     def collide(self):
-        global IA, IA_D, Static, Obstacle, Entity
+        global core, IA, IA_D, Static, Obstacle, Entity
         cond = False
-        for e in Entity.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                    if e is self:continue
+        x, y = self.pos
+        a=0
+        x+=256
+        y+=256
+        while a < 9:
+            if a%3:
+                x-=256
+            elif a//3:
+                x+=512
+                y-=256
+            for e in core.area["entity"][self.chunk[0]+a%3-1][self.chunk[1]+a//3-1]:
+                if e.pos[0] + e.size[0] > x and x + self.size[0] > e.pos[0] and e.pos[1] + e.size[1] > y and y + self.size[1] > e.pos[1]:
                     # collision
                     coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed.value + e.speed:
+                    if x + self.size[0] + e.move[0]*e.speed <= e.pos[0] + self.move[0]*self.speed + 0.4*(e.speed+self.speed):
                         # droite
-                        self.pos[0] += -self.speed.value
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed.value + e.speed:
+                        if self.move[0]==1:x -= self.speed * (1 - 0.3 * abs(self.move[1]))
+                        if e.move[0]==-1:e.pos[0] += e.speed * (1 - 0.3 * abs(e.move[1]))
+                    elif x + e.move[0]*e.speed + 0.4*(e.speed+self.speed) >= e.pos[0] + e.size[0] + self.move[0]*self.speed:
                         # gauche
-                        self.pos[0] += self.speed.value
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed.value + e.speed:
+                        if self.move[0]==-1:x += self.speed * (1 - 0.3 * abs(self.move[1]))
+                        if e.move[0]==1:e.pos[0] -= e.speed * (1 - 0.3 * abs(e.move[1]))
+                    if y + self.size[1] + e.move[1]*e.speed <= e.pos[1] + self.move[1]*self.speed + 0.4*(e.speed+self.speed):
                         # bas
-                        self.pos[1] += -self.speed.value
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed.value + e.speed:
+                        if self.move[1]==1:y -= self.speed * (1 - 0.3 * abs(self.move[0]))
+                        if e.move[1]==-1:e.pos[1] += e.speed * (1 - 0.3 * abs(e.move[0]))
+                    elif y + e.move[1]*e.speed + 0.4*(e.speed+self.speed) >= e.pos[1] + e.size[1] + self.move[1]*self.speed:
                         # haut
-                        self.pos[1] += self.speed.value
-        for e in IA.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+                        if self.move[1]==-1:y += self.speed * (1 - 0.3 * abs(self.move[0]))
+                        if e.move[1]==1:e.pos[1] -= e.speed * (1 - 0.3 * abs(e.move[0]))
+                    if e.atk_delay == 0:
+                        e.atk_delay = e.atk_freq
+                        self.live+=-e.dmg
+                        if self.sounded:self.sound.play()
+            a+=1
+        a=0
+        x+=512
+        y+=512
+        while a < 4:
+            if a%2:
+                x-=256
+            elif a//2:
+                x+=256
+                y-=256
+            for e in core.area["obs"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e.pos[2] > x and x + self.size[0] > e.pos[0] and e.pos[3] > y and y + self.size[1] > e.pos[1]:
                     # collision
                     coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed.value + e.speed:
+                    if self.move[0] == 1 and x + self.size[0] <= e.pos[0] + self.speed:
                         # droite
-                        self.pos[0] += -self.speed.value
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed.value + e.speed:
+                        x = e.pos[0] - self.size[0]
+                    elif self.move[0] == -1 and e.pos[2] <= x + self.speed:
                         # gauche
-                        self.pos[0] += self.speed.value
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed.value + e.speed:
+                        x = e.pos[0] + e.size[0]
+                    elif self.move[1] == 1 and y + self.size[1] <= e.pos[1] + self.speed:
                         # bas
-                        self.pos[1] += -self.speed.value
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed.value + e.speed:
+                        y = e.pos[1] - self.size[1]
+                    elif self.move[1] == -1 and e.pos[3] <= y + self.speed:
                         # haut
-                        self.pos[1] += self.speed.value
-        for e in IA_D.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+                        y = e.pos[1] + e.size[1]
+            for e in core.area["static"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e[2][0] > x and x + self.size[0] > e[1][0] and e[2][1] > y and y + self.size[1] > e[1][1]:
                     # collision
                     coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed.value + e.speed:
+                    if self.move[0] == 1 and x + self.size[0] <= e[1][0] + self.speed:
                         # droite
-                        self.pos[0] += -self.speed.value
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed.value + e.speed:
+                        x = e[1][0] - self.size[0]
+                    elif self.move[0] == -1 and e[2][0] <= x + self.speed:
                         # gauche
-                        self.pos[0] += self.speed.value
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed.value + e.speed:
+                        x = e[2][0]
+                    elif self.move[1] == 1 and y + self.size[1] <= e[1][1] + self.speed:
                         # bas
-                        self.pos[1] += -self.speed.value
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed.value + e.speed:
+                        y = e[1][1] - self.size[1]
+                    elif self.move[1] == -1 and e[2][1] <= y + self.speed:
                         # haut
-                        self.pos[1] += self.speed.value
-        for e in Obstacle.entities:
-            if e.pos[2] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[3] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                    # collision
-                    coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed.value:
-                        # droite
-                        self.pos[0] = e.pos[0] - self.size[0]
-                    elif self.move[0] == -1 and e.pos[2] <= self.pos[0] + self.speed.value:
-                        # gauche
-                        self.pos[0] = e.pos[0] + e.size[0]
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed.value:
-                        # bas
-                        self.pos[1] = e.pos[1] - self.size[1]
-                    elif self.move[1] == -1 and e.pos[3] <= self.pos[1] + self.speed.value:
-                        # haut
-                        self.pos[1] = e.pos[1] + e.size[1]
-        for e in Static.entities:
-            if e[2][0] > self.pos[0] and self.pos[0] + self.size[0] > e[1][0]:
-                if e[2][1] > self.pos[1] and self.pos[1] + self.size[1] > e[1][1]:
-                    # collision
-                    coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e[1][0] + self.speed.value:
-                        # droite
-                        self.pos[0] = e[1][0] - self.size[0]
-                    elif self.move[0] == -1 and e[2][0] <= self.pos[0] + self.speed.value:
-                        # gauche
-                        self.pos[0] = e[2][0]
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e[1][1] + self.speed.value:
-                        # bas
-                        self.pos[1] = e[1][1] - self.size[1]
-                    elif self.move[1] == -1 and e[2][1] <= self.pos[1] + self.speed.value:
-                        # haut
-                        self.pos[1] = e[2][1]
-        if self.atk_delay.value > 0:
-            self.atk_delay.value+=-1
+                        y = e[2][1]
+            a+=1
+        if self.atk_delay > 0:
+            self.atk_delay+=-1
+        self.pos[0]=x
+        self.pos[1]=y
 
 class Static:
     __doc__ = """Utiliser 'nom = Static(*args)' pour créer un mur.
+Utiliser nom.append(pos, chunk) pour ajouter une mur.
 Renvoie un type d'objet indestructible et immobile.
 Tout objet Static ne pourra jamais être traversé, il sera toujours 'solide'.
 img_format : format de l'image ('png' par défaut)
-size : tuple de la hauteur et de la largeur de l'entité désiré
-Utiliser nom.append(pos) pour ajouter une entité"""
-    entities = []
+size : tuple de la hauteur et de la largeur de l'entité désiré"""
     def __init__(self, name, size, img_format="png"):
         global Static
         self.img = pygame.transform.scale(pygame.image.load("textures/"+name + "."+img_format), size)
         self.size = size
-    def append(self, pos):
-        "pos : position du mur (exemple : (367, -23) )"
-        self.entities.append((self.img, pos, (pos[0]+self.size[0], pos[1]+self.size[1]) ))
+    def append(self, pos, chunk):
+        "pos : position du mur dans le chunk de 0 à 255 (exemple : (314,159))\nchunk : chunk contenant le mur de -29 à 29 (exemple : (1,-2))"
+        global core
+        self.pos = pos + (pos[0]+self.size[0], pos[1]+self.size[1])
+        a = (pos[0]+self.size[0]//2-128)//256
+        b = (pos[1]+self.size[1]//2-128)//256
+        chunk = list(chunk)
+        pos = list(pos)
+        chunk[0] += a+31
+        chunk[1] += b+31
+        pos[0] += -a*256
+        pos[1] += -b*256
+        core.area["static"][chunk[0]][chunk[1]].append((self.img, pos, (pos[0]+self.size[0], pos[1]+self.size[1])))
 
 class Obstacle:
-    __doc__ = """Utiliser 'class <nom>(Obstacle):' pour créer un obstacle.
+    __doc__ = """Utiliser 'class <nom>(Obstacle):' pour créer un obstacle (similaire à mur).
 Attributs de ce type de classe :
 live : points de vie de l'obstacle
 img_format : format de l'image ('png' par défaut)
 size : tuple de la hauteur et de la largeur de l'entité désiré
 Ce type d'objet est statique mais destructible."""
     entities = []
-    def __init__(self, pos):
+    def __init__(self, pos, chunk):
+        global core
         self.pos = pos + (pos[0]+self.size[0], pos[1]+self.size[1])
-        self.live = Value("i", self.live)
+        self.chunk = (chunk[0]+31, chunk[1]+31)
         self.entities.append(self)
+        core.area["obs"][self.chunk[0]][self.chunk[1]].append(self)
+        
     img_format="png"
     img=None
     sounded = False
     sound = None
     def clean():
-        global Obstacle
+        global Obstacle,core
         a=0;b=len(Obstacle.entities)
         while a < b:
-            if Obstacle.entities[a].live.value <= 0:
+            if Obstacle.entities[a].live <= 0:
+                core.area["obs"][Obstacle.entities[a].chunk[0]][Obstacle.entities[a].chunk[1]].remove(Obstacle.entities[a])
                 del Obstacle.entities[a]
                 b+=-1
             else:a+=1
 
 def Rien(self):pass
-conversion = {(1, 0) : 0,(1, 1) : 45,(0, 1) : 90,(-1, 1) : 135,(-1, 0) : 180,(-1, -1): 225,(0, -1) : 270,(1, -1) : 315}
 
 class Fired:
     __doc__ = """Utiliser 'class <nom>(Fired):' pour créer un projectile.
@@ -332,11 +496,6 @@ speed : vitesse de déplacement (0 par défaut)
 pcoll : activer la collision avec le joueur (True par défaut)
 ecoll : activer la collision avec les entités (True par défaut)
 action : action supplémentaire quand contact avec le joueur (renvoie le projectile comme argument)
---> action agit uniquement sur des 'Value' ou 'Array'. Exemple :
-a = Value("i", 0) # créé un Value qui contient 'i' pour un int et 'f' pour un float
-a.value --> valeur de a
-b = Array("i", longueur) # créé une liste contenant UNIQUEMENT des int ou des float ('i' pour int et 'f' pour float)
-b[2] --> valeur en position 2 dans b
 dmg : dégâts infligés à l'objet/entité touché (0 par défaut)
 delay : durée de vie du projectile (en tic) (-1 par défaut)
 img_format : format du "tableau d'image" ((1, 'png') par défaut)
@@ -349,7 +508,7 @@ Ce type d'entité se détruit au contact en infligeant des dégats"""
     actives = []
     speed = 0
     pcoll = True
-    ecoll = False
+    ecoll = True
     action = Rien
     sounded = False
     sound = None
@@ -359,133 +518,165 @@ Ce type d'entité se détruit au contact en infligeant des dégats"""
     effects = tuple()
     img_format = (1, "png")
     img=None
-    def __init__(self, pos, move):
+    def __init__(self, pos, chunk, move):
         """pos : position du projectile (exemple : (367, -23) )
 move : mouvement du projectile en x et en y.
 1 : mouvement positif, 0 : immobile et -1 : mouvement négatif
 (exemple : (-1, 1) )"""
-        global conversion
+        global Player
         self.frame = randint(1-self.img_format[0], 0)
-        self.pos = Array("f", pos, lock=False)
-        self.move = Array("i", move, lock=False)
-        self.delay = Array("i", self.delay, lock=False)
-        for a in self.img:
-            a = pygame.transform.rotate(a, conversion[tuple(move)])
+        self.pos = list(pos)
+        self.chunk = list(chunk)
+        if move == [0,0]:move=list({0:(1, 0), 1:(0, 1), 2:(-1, 0), 3:(0, -1)}[Player.dir])
+        self.move = move
+        img=list()
+        for a in self.img[0]:
+            img.append(pygame.transform.rotate(a, {(1, 0) : 0,(1, 1) : 45,(0, 1) : 90,(-1, 1) : 135,(-1, 0) : 180,(-1, -1): 225,(0, -1) : 270,(1, -1) : 315}[tuple(move)]))
+        self.img=img
         self.entities.append(self)
-        self.actives.append(Process(target=self.react))
-        self.actives[-1].start()
+        self.actives.append(self.react)
 
     def clean():
         global Fired
         a=0;b=len(Fired.entities)
         while a < b:
-            if Fired.entities[a].delay.value == 0:
+            if Fired.entities[a].delay == 0:
                 if Fired.entities[a].sounded:Fired.entities[a].sound.play()
                 del Fired.entities[a]
                 del Fired.actives[a]
                 b+=-1
-            else:
-                Fired.entities[a].delay.value += -1
-                Fired.entities[a].pos[0] += Fired.entities[a].move[0] * (Fired.entities[a].speed * (1 - 0.3 * abs(Fired.entities[a].move[1])))
-                Fired.entities[a].pos[1] += Fired.entities[a].move[1] * (Fired.entities[a].speed * (1 - 0.3 * abs(Fired.entities[a].move[0])))
-                a+=1
+            else:a+=1
     def react(self):
-        global Entity, IA, IA_D, Obstacle, Static
-        if self.pcoll and Player.pos[0] + Player.size[0] > self.pos[0] and self.pos[0] + self.size[0] > Player.pos[0]:
-            if Player.pos[1] + Player.size[1] > self.pos[1] and self.pos[1] + self.size[1] > Player.pos[1]:
-                # collision
-                Player.live.acquire()
-                self.action()
-                self.delay.value = 0
-                Player.live.value += -self.dmg
-                Player.live.release()
-                e.apply_all(self.give_effect)
-                if Player.sounded:Player.sound.play()
-        if self.ecoll:
-            for e in Entity.entities:
-                if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                    if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+        global core
+        "Test if entity exit chunk"
+        if self.pos[0] + self.Size[0] < 0:
+            # sortie à gauche
+            if self.chunk[0] > 1:
+                self.chunk[0]-=1
+                self.pos[0]+=256
+            else:
+                self.pos[0]=0
+        elif self.pos[0] + self.Size[0] > 256:
+            # sortie à droite
+            if self.chunk[0] < 62:
+                self.chunk[0]+=1
+                self.pos[0]-=256
+            else:
+                self.pos[0]=256-self.size[0]
+        if self.pos[1] + self.Size[1] < 0:
+            # sortie en haut
+            if self.chunk[1] > 1:
+                self.chunk[1]-=1
+                self.pos[1]+=256
+            else:
+                self.pos[1]=0
+        elif self.pos[1] + self.Size[1] > 256:
+            # sortie en bas
+            if self.chunk[1] < 62:
+                self.chunk[1]+=1
+                self.pos[1]-=256
+            else:
+                self.pos[1]=256-self.size[1]
+        if self.delay>0:self.delay += -1
+        x = self.pos[0] + self.move[0] * (self.speed * (1 - 0.3 * abs(self.move[1])))
+        y = self.pos[1] + self.move[1] * (self.speed * (1 - 0.3 * abs(self.move[0])))
+        if self.pcoll and Player.pos[0] + Player.size[0] > x and x + self.size[0] > Player.pos[0] and Player.pos[1] + Player.size[1] > y and y + self.size[1] > Player.pos[1]:
+            # collision
+            self.action()
+            self.delay = 0
+            Player.live += -self.dmg
+            e.apply_all(self.effects)
+            if Player.sounded:Player.sound.play()
+        x+=256
+        y+=256
+        for a in range(0,4):
+            if a%2:
+                x+=-256
+            elif a//2:
+                x+=256
+                y-=256
+            if self.ecoll:
+                for e in core.area["entity"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                    if e.pos[0] + e.size[0] > x and x + self.size[0] > e.pos[0] and e.pos[1] + e.size[1] > y and y + self.size[1] > e.pos[1]:
                         # collision
-                        self.delay.value = 0
-                        e.live.acquire()
-                        e.live.value += -self.dmg
-                        e.live.release()
-                        e.apply_all(self.give_effect)
+                        self.delay = 0
+                        e.live -= self.dmg
+                        e.apply_all(self.effects)
                         if e.sounded:e.sound.play()
-            for e in IA.entities:
-                if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                    if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                        # collision
-                        self.delay.value = 0
-                        e.live.acquire()
-                        e.live.value += -self.dmg
-                        e.live.release()
-                        e.apply_all(self.give_effect)
-                        if e.sounded:e.sound.play()
-            for e in IA_D.entities:
-                if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                    if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                        # collision
-                        self.delay.value = 0
-                        e.live.acquire()
-                        e.live.value += -self.dmg
-                        e.live.release()
-                        e.apply_all(self.give_effect)
-                        if e.sounded:e.sound.play()
-        for e in Obstacle.entities:
-            if e.pos[2] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[3] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+            for e in core.area["obs"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e.pos[2] > x and x + self.size[0] > e.pos[0] and e.pos[3] > y and y + self.size[1] > e.pos[1]:
                     # collision
-                    self.delay.value = 0
+                    self.delay = 0
+                    e.live -= self.dmg
                     if e.sounded:e.sound.play()
-        for e in Static.entities:
-            if e[2][0] > self.pos[0] and self.pos[0] + self.size[0] > e[1][0]:
-                if e[2][1] > self.pos[1] and self.pos[1] + self.size[1] > e[1][1]:
+            for e in core.area["static"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e[2][0] > x and x + self.size[0] > e[1][0] and e[2][1] > y and y + self.size[1] > e[1][1]:
                     # collision
-                    self.delay.value = 0
+                    self.delay = 0
+        self.pos[0]=x
+        self.pos[1]=y
 
 def Suivre(self):
-    b = abs(self.pos[0] - Player.pos[0]) > abs(self.pos[1] - Player.pos[1])
-    if self.pos[0] < Player.pos[0]:
-        if b:
+    global core
+    a = self.pos[0] - Player.pos[0] + 256*(self.chunk[0] - Player.chunk[0])
+    b = self.pos[1] - Player.pos[1] + 256*(self.chunk[1] - Player.chunk[1])
+    c = abs(a) > abs(b)
+    if a < 0:
+        if c:
             self.move[0] = 1
-            self.dir.value=0
+            self.dir=0
         else:
-            if self.pos[0] == Player.pos[0]:pass
-            elif abs(self.pos[0] - Player.pos[0]) > self.speed:self.move[0] = 1
+            if a == 0:pass
+            elif abs(a) > self.speed:self.move[0] = 1
             else:
                 self.move[0] = 0
                 self.pos[0] = Player.pos[0]
+                if self.chunk[0] != Player.chunk[0]:
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                    self.chunk[0]=Player.chunk[0]
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
     else:
-        if b:
+        if c:
             self.move[0] = -1
-            self.dir.value=2
+            self.dir=2
         else:
-            if self.pos[0] == Player.pos[0]:pass
-            elif abs(self.pos[0] - Player.pos[0]) > self.speed:self.move[0] = -1
+            if a == 0:pass
+            elif abs(a) > self.speed:self.move[0] = -1
             else:
                 self.move[0] = 0
                 self.pos[0] = Player.pos[0]
-    if self.pos[1] < Player.pos[1]:
-        if b:
-            if self.pos[1] == Player.pos[1]:pass
-            elif abs(self.pos[1] - Player.pos[1]) > self.speed:self.move[1] = 1
+                if self.chunk[0] != Player.chunk[0]:
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                    self.chunk[0]=Player.chunk[0]
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
+    if b < 0:
+        if c:
+            if b == 0:pass
+            elif abs(b) > self.speed:self.move[1] = 1
             else:
                 self.move[1] = 0
                 self.pos[1] = Player.pos[1]
+                if self.chunk[1] != Player.chunk[1]:
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                    self.chunk[1]=Player.chunk[1]
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
         else:
             self.move[1] = 1
-            self.dir.value=1
+            self.dir=1
     else:
-        if b:
-            if self.pos[1] == Player.pos[1]:pass
-            elif abs(self.pos[1] - Player.pos[1]) > self.speed:self.move[1] = -1
+        if c:
+            if b == 0:pass
+            elif abs(b) > self.speed:self.move[1] = -1
             else:
                 self.move[1] = 0
                 self.pos[1] = Player.pos[1]
+                if self.chunk[1] != Player.chunk[1]:
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].remove(self)
+                    self.chunk[1]=Player.chunk[1]
+                    core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
         else:
             self.move[1] = -1
-            self.dir.value=3
+            self.dir=3
 
 class Entity(BaseEntity):
     __doc__ = """Utiliser 'class <nom>(Fired):' pour créer une entité.
@@ -499,13 +690,9 @@ dmg : dégats infligés à la cible (5 par défaut)
 atk_freq : temps (en tic) entre 2 attaques de l'IA (20 par défaut)
 speed : vitesse de déplacement de l'entité
 range : distance de vue de l'entité
-killscore : nombre de points gagnés lorsque l'entité est tuée"""
-    live=100
-    img_format=(1, "png")
-    dmg=5
-    atk_freq=20
-    atk_delay=0
-    killscore=0
+xp : nombre de points gagnés lorsque l'entité est tuée"""
+    dmg=2
+    xp=0
     dir=0
     speed = 2
     img=None
@@ -514,148 +701,123 @@ killscore : nombre de points gagnés lorsque l'entité est tuée"""
     actives = []
     sounded = False
     sound = None
-    def __init__(self, pos):
+    def __init__(self, pos, chunk):
+        global core
         self.effect = list()
         self.frame = randint(1-self.img_format[0], 0)
-        self.pos = Array("f", pos, lock=False)
-        self.live = Value("i", self.live)
-        self.move = Array("i", 2, lock=False)   # mouvement
-        self.dir = Value("i", 0, lock=False)    # direction
-        self.atk_delay = Value("i", 0, lock=False)
+        self.pos = list(pos)
+        self.chunk = [chunk[0]+31, chunk[1]+31]
+        self.move = [0, 0]  # mouvement
+        self.dir = 0        # direction
+        self.atk_delay = 0
         self.entities.append(self)
-        self.actives.append(Process(target=self.react))
-        self.actives[-1].start()
+        self.actives.append(self.react)
+        core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
     def clean():
         global Entity, core
         a=0;b=len(Entity.entities)
         while a < b:
-            if Entity.entities[a].live.value <= 0:
-                core.score+=Entity.entities[a].killscore
+            if Entity.entities[a].live <= 0:
+                E = Entity.entities[a]
+                core.score+=E.xp
+                core.area["entity"][E.chunk[0]][E.chunk[1]].remove(E)
                 del Entity.entities[a]
                 del Entity.actives[a]
                 b+=-1
             else:a+=1
     suivre = Suivre
     def react(self):
-        if abs(self.pos[0] - Player.pos[0]) < self.range and abs(self.pos[1] - Player.pos[1]) < self.range:self.suivre()
+        if abs(self.chunk[0] - Player.chunk[0]) + abs(self.chunk[1] - Player.chunk[1]) < self.range:self.suivre()
         self.pos[0] += self.move[0] * self.speed * (1-abs(self.move[1]) * 0.3)
         self.pos[1] += self.move[1] * self.speed * (1-abs(self.move[0]) * 0.3)
+        self.chunking()
         self.collide()
     def collide(self):
         global Player, IA, IA_D, Static, Obstacle, Entity
         cond = False
-        for e in Entity.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+        x, y = self.pos[0:2]
+        a=0
+        x+=256
+        y+=256
+        while True:
+            if a%2:
+                x-=256
+            elif a//2:
+                x+=256
+                y-=256
+            for e in core.area["entity"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e.pos[0] + e.size[0] > x and x + self.size[0] > e.pos[0] and e.pos[1] + e.size[1] > y and y + self.size[1] > e.pos[1]:
                     if e is self:continue
                     # collision
                     coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed + e.speed:
+                    unsolved=True
+                    if x + self.size[0] + e.move[0]*e.speed <= e.pos[0] + self.move[0]*self.speed + 0.3*(e.speed+self.speed):
                         # droite
-                        self.pos[0] += -self.speed
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed + e.speed:
+                        if self.move[0]==1:x -= self.speed * (1 - 0.3 * abs(self.move[1]))
+                        if e.move[0]==-1:e.pos[0] += e.speed * (1 - 0.3 * abs(e.move[1]))
+                        unsolved=False
+                    elif x + e.move[0]*e.speed + 0.3*(e.speed+self.speed) >= e.pos[0] + e.size[0] + self.move[0]*self.speed:
                         # gauche
-                        self.pos[0] += self.speed
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed + e.speed:
+                        if self.move[0]==-1:x += self.speed * (1 - 0.3 * abs(self.move[1]))
+                        if e.move[0]==1:e.pos[0] -= e.speed * (1 - 0.3 * abs(e.move[1]))
+                        unsolved=False
+                    if y + self.size[1] + e.move[1]*e.speed <= e.pos[1] + self.move[1]*self.speed + 0.3*(e.speed+self.speed):
                         # bas
-                        self.pos[1] += -self.speed
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed + e.speed:
+                        if self.move[1]==1:y -= self.speed * (1 - 0.3 * abs(self.move[0]))
+                        if e.move[1]==-1:e.pos[1] += e.speed * (1 - 0.3 * abs(e.move[0]))
+                        unsolved=False
+                    elif y + e.move[1]*e.speed + 0.3*(e.speed+self.speed) >= e.pos[1] + e.size[1] + self.move[1]*self.speed:
                         # haut
-                        self.pos[1] += self.speed
-        for e in IA.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+                        if self.move[1]==-1:y += self.speed * (1 - 0.3 * abs(self.move[0]))
+                        if e.move[1]==1:e.pos[1] -= e.speed * (1 - 0.3 * abs(e.move[0]))
+                        unsolved=False
+                    if unsolved:
+                        # méthode anti-superposition !
+                        if self.move[0]==1:x -= self.speed * (2 - 0.6 * abs(self.move[1]))
+                        elif self.move[0]==-1:x += self.speed * (2 - 0.6 * abs(self.move[1]))
+                        if self.move[1]==1:y -= self.speed * (2 - 0.6 * abs(self.move[0]))
+                        elif self.move[1]==-1:y += self.speed * (2 - 0.6 * abs(self.move[0]))
+            if a == 4:break
+            for e in core.area["obs"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e.pos[2] > x and x + self.size[0] > e.pos[0] and e.pos[3] > y and y + self.size[1] > e.pos[1]:
                     # collision
                     coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed + e.speed:
+                    if x + self.size[0] <= e.pos[0] + self.speed:
                         # droite
-                        self.pos[0] += -self.speed
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed + e.speed:
+                        x = e.pos[0] - self.size[0]
+                    elif e.pos[2] <= x + self.speed:
                         # gauche
-                        self.pos[0] += self.speed
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed + e.speed:
+                        x = e.pos[2]
+                    elif y + self.size[1] <= e.pos[1] + self.speed:
                         # bas
-                        self.pos[1] += -self.speed
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed + e.speed:
+                        y = e.pos[1] - self.size[1]
+                    elif e.pos[3] <= y + self.speed:
                         # haut
-                        self.pos[1] += self.speed
-        for e in IA_D.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+                        y = e.pos[3]
+            for e in core.area["static"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e[2][0] > x and x + self.size[0] > e[1][0] and e[2][1] > y and y + self.size[1] > e[1][1]:
                     # collision
                     coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed + e.speed:
+                    if x + self.size[0] <= e[1][0] + self.speed:
                         # droite
-                        self.pos[0] += -self.speed
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed + e.speed:
+                        x = e[1][0] - self.size[0]
+                    elif e[2][0] <= x + self.speed:
                         # gauche
-                        self.pos[0] += self.speed
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed + e.speed:
+                        x = e[2][0]
+                    elif y + self.size[1] <= e[1][1] + self.speed:
                         # bas
-                        self.pos[1] += -self.speed
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed + e.speed:
+                        y = e[1][1] - self.size[1]
+                    elif e[2][1] <= y + self.speed:
                         # haut
-                        self.pos[1] += self.speed
-        for e in Obstacle.entities:
-            if e.pos[2] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[3] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                    # collision
-                    coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed:
-                        # droite
-                        self.pos[0] = e.pos[0] - self.size[0]
-                    elif self.move[0] == -1 and e.pos[2] <= self.pos[0] + self.speed:
-                        # gauche
-                        self.pos[0] = e.pos[0] + e.size[0]
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed:
-                        # bas
-                        self.pos[1] = e.pos[1] - self.size[1]
-                    elif self.move[1] == -1 and e.pos[3] <= self.pos[1] + self.speed:
-                        # haut
-                        self.pos[1] = e.pos[1] + e.size[1]
-        for e in Static.entities:
-            if e[2][0] > self.pos[0] and self.pos[0] + self.size[0] > e[1][0]:
-                if e[2][1] > self.pos[1] and self.pos[1] + self.size[1] > e[1][1]:
-                    # collision
-                    coll=True
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e[1][0] + self.speed:
-                        # droite
-                        self.pos[0] = e[1][0] - self.size[0]
-                    elif self.move[0] == -1 and e[2][0] <= self.pos[0] + self.speed:
-                        # gauche
-                        self.pos[0] = e[2][0]
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e[1][1] + self.speed:
-                        # bas
-                        self.pos[1] = e[1][1] - self.size[1]
-                    elif self.move[1] == -1 and e[2][1] <= self.pos[1] + self.speed:
-                        # haut
-                        self.pos[1] = e[2][1]
-        if self.atk_delay.value > 0:
-            self.atk_delay.value+=-1
+                        y = e[2][1]
+            a+=1
+        if self.atk_delay > 0:
+            self.atk_delay+=-1
         if cond:
             self.move[0] = randint(-1, 1)
             self.move[1] = randint(-1, 1)
-        if Player.pos[0] + Player.size[0] > self.pos[0] and self.pos[0] + self.size[0] > Player.pos[0]:
-            if Player.pos[1] + Player.size[1] > self.pos[1] and self.pos[1] + self.size[1] > Player.pos[1]:
-                # collision
-                if self.move[0] == 1 and self.pos[0] + self.size[0] <= Player.pos[0] + self.speed + Player.speed.value:
-                    # droite
-                    self.pos[0] += -self.speed
-                elif self.move[0] == -1 and Player.pos[0] + Player.size[0] <= self.pos[0] + self.speed + Player.speed.value:
-                    # gauche
-                    self.pos[0] += self.speed
-                elif self.move[1] == 1 and self.pos[1] + self.size[1] <= Player.pos[1] + self.speed + Player.speed.value:
-                    # bas
-                    self.pos[1] += -self.speed
-                elif self.move[1] == -1 and Player.pos[1] + Player.size[1] <= self.pos[1] + self.speed + Player.speed.value:
-                    # haut
-                    self.pos[1] += self.speed
-                if self.atk_delay.value == 0:
-                    self.atk_delay.value = self.atk_freq
-                    Player.live.acquire()
-                    Player.live.value+=-self.dmg
-                    Player.live.release()
-                    if Player.sounded:Player.sound.play()
+        self.pos[0]=x-256
+        self.pos[1]=y+256
 
 class IA(BaseEntity):
     __doc__ = """Utiliser 'class <nom>(IA):' pour créer une IA.
@@ -669,14 +831,10 @@ dmg : dégats infligés à la cible (5 par défaut)
 atk_freq : temps (en tic) entre 2 attaques de l'IA (20 par défaut)
 delay : temps de vie (en tic) de l'IA (-1 par défaut)
 speed : vitesse de déplacement de l'IA
-killscore : nombre de points gagnés lorsque l'IA est tuée"""
-    live=100
-    img_format=(1, "png")
-    dmg=5
+xp : nombre de points gagnés lorsque l'IA est tuée"""
+    dmg=2
     delay = 0
-    atk_freq=20
-    atk_delay=0
-    killscore=0
+    xp=0
     dir=0
     speed = 2
     indirect=0
@@ -689,261 +847,246 @@ killscore : nombre de points gagnés lorsque l'IA est tuée"""
         global IA, core
         a=0;b=len(IA.entities)
         while a < b:
-            if IA.entities[a].delay == 0 or IA.entities[a].live.value <= 0:
-                if IA.entities[a].delay != 0:core.score+=IA.entities[a].killscore
+            if IA.entities[a].delay == 0 or IA.entities[a].live <= 0:
+                I = IA.entities[a]
+                if I.delay != 0:core.score+=I.xp
+                core.area["entity"][I.chunk[0]][I.chunk[1]].remove(I)
                 del IA.entities[a]
                 del IA.actives[a]
                 b+=-1
             else:
                 a+=1
-    def __init__(self, pos):
+    def __init__(self, pos, chunk):
+        global core
         self.effect = list()
         self.frame = randint(1-self.img_format[0], 0)
-        self.pos = Array("f", pos, lock=False)
-        self.live = Value("i", self.live)
-        self.move = Array("i", 2, lock=False)   # mouvement
-        self.dir = Value("i", 0, lock=False)    # direction
-        self.DIR = Value("i", 0, lock=False)    # direction initiale
-        self.atk_delay = Value("i", 0, lock=False)
-        self.indirect = Value("i", 0, lock=False)
+        self.pos = list(pos)
+        self.chunk = [chunk[0]+31, chunk[1]+31]
+        self.move = [0,0]   # mouvement
+        self.dir = 0        # direction
+        self.DIR = 0        # direction initiale
+        self.atk_delay = 0
+        self.indirect = 0
         self.entities.append(self)
-        self.actives.append(Process(target=self.react))
-        self.actives[-1].start()
+        self.actives.append(self.react)
+        core.area["entity"][self.chunk[0]][self.chunk[1]].append(self)
     suivre = Suivre
     def react(self):
         global Player
-        if not self.indirect.value:self.suivre()
+        if not self.indirect:self.suivre()
         self.pos[0] += self.move[0] * self.speed * (1-abs(self.move[1]) * 0.3)
         self.pos[1] += self.move[1] * self.speed * (1-abs(self.move[0]) * 0.3)
+        self.chunking()
         self.collide()
     def collide(self):
         global Player, IA, IA_D, Static, Obstacle, Entity
         self.delay+=-1
         cond = True
-        for e in Entity.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                    # collision
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed + e.speed:
-                        # droite
-                        self.pos[0] += -self.speed
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed + e.speed:
-                        # gauche
-                        self.pos[0] += self.speed
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed + e.speed:
-                        # bas
-                        self.pos[1] += -self.speed
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed + e.speed:
-                        # haut
-                        self.pos[1] += self.speed
-        for e in IA.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
+        x, y = self.pos[0:2]
+        a=0
+        x+=256
+        y+=256
+        while True:
+            if a%2:
+                x-=256
+            elif a//2:
+                x+=256
+                y-=256
+            for e in core.area["entity"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e.pos[0] + e.size[0] > x and x + self.size[0] > e.pos[0] and e.pos[1] + e.size[1] > y and y + self.size[1] > e.pos[1]:
                     if e is self:continue
                     # collision
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed + e.speed:
+                    coll=True
+                    unsolved = True
+                    if x + self.size[0] + e.move[0]*e.speed <= e.pos[0] + self.move[0]*self.speed + 0.3*(e.speed+self.speed):
                         # droite
-                        self.pos[0] += -self.speed
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed + e.speed:
+                        if self.move[0]==1:x -= self.speed * (1 - 0.3 * abs(self.move[1]))
+                        if e.move[0]==-1:e.pos[0] += e.speed * (1 - 0.3 * abs(e.move[1]))
+                        unsolved = False
+                    elif x + e.move[0]*e.speed + 0.3*(e.speed+self.speed) >= e.pos[0] + e.size[0] + self.move[0]*self.speed:
                         # gauche
-                        self.pos[0] += self.speed
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed + e.speed:
+                        if self.move[0]==-1:x += self.speed * (1 - 0.3 * abs(self.move[1]))
+                        if e.move[0]==1:e.pos[0] -= e.speed * (1 - 0.3 * abs(e.move[1]))
+                        unsolved = False
+                    if y + self.size[1] + e.move[1]*e.speed <= e.pos[1] + self.move[1]*self.speed + 0.3*(e.speed+self.speed):
                         # bas
-                        self.pos[1] += -self.speed
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed + e.speed:
+                        if self.move[1]==1:y -= self.speed * (1 - 0.3 * abs(self.move[0]))
+                        if e.move[1]==-1:e.pos[1] += e.speed * (1 - 0.3 * abs(e.move[0]))
+                        unsolved = False
+                    elif y + e.move[1]*e.speed + 0.3*(e.speed+self.speed) >= e.pos[1] + e.size[1] + self.move[1]*self.speed:
                         # haut
-                        self.pos[1] += self.speed
-        for e in IA_D.entities:
-            if e.pos[0] + e.size[0] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[1] + e.size[1] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                    if e is self:continue
+                        if self.move[1]==-1:y += self.speed * (1 - 0.3 * abs(self.move[0]))
+                        if e.move[1]==1:e.pos[1] -= e.speed * (1 - 0.3 * abs(e.move[0]))
+                        unsolved = False
+                    if unsolved:
+                        # méthode anti-superposition !
+                        if self.move[0]==1:x -= self.speed * (2 - 0.6 * abs(self.move[1]))
+                        elif self.move[0]==-1:x += self.speed * (2 - 0.6 * abs(self.move[1]))
+                        if self.move[1]==1:y -= self.speed * (2 - 0.6 * abs(self.move[0]))
+                        elif self.move[1]==-1:y += self.speed * (2 - 0.6 * abs(self.move[0]))
+            if a == 4:break
+            for e in core.area["obs"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e.pos[2] > x and x + self.size[0] > e.pos[0] and e.pos[3] > y and y + self.size[1] > e.pos[1]:
                     # collision
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed + e.speed:
+                    if x + self.size[0] <= e.pos[0] + self.speed:
                         # droite
-                        self.pos[0] += -self.speed
-                    elif self.move[0] == -1 and e.pos[0] + e.size[0] <= self.pos[0] + self.speed + e.speed:
-                        # gauche
-                        self.pos[0] += self.speed
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed + e.speed:
-                        # bas
-                        self.pos[1] += -self.speed
-                    elif self.move[1] == -1 and e.pos[1] + e.size[1] <= self.pos[1] + self.speed + e.speed:
-                        # haut
-                        self.pos[1] += self.speed
-        for e in Obstacle.entities:
-            if e.pos[2] > self.pos[0] and self.pos[0] + self.size[0] > e.pos[0]:
-                if e.pos[3] > self.pos[1] and self.pos[1] + self.size[1] > e.pos[1]:
-                    # collision
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e.pos[0] + self.speed:
-                        # droite
-                        self.pos[0] = e.pos[0] - self.size[0]
-                        if self.indirect.value == 1:
+                        x = e.pos[0] - self.size[0]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 1:cond = False
-                            elif self.dir.value == 0:
-                                self.dir.value = 1
+                            if self.dir == 1:cond = False
+                            elif self.dir == 0:
+                                self.dir = 1
                                 self.move[1] = 1
                                 cond = False
-                        elif self.dir.value == 0:
+                        elif self.dir == 0:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 1
+                            self.dir = 1
                             self.move[1] = 1
-                            self.indirect.value = 1
-                            self.DIR.value = 0
+                            self.indirect = 1
+                            self.DIR = 0
                             cond = False
-                    elif self.move[0] == -1 and e.pos[2] <= self.pos[0] + self.speed:
+                    elif e.pos[2] <= x + self.speed:
                         # gauche
-                        self.pos[0] = e.pos[0] + e.size[0]
-                        if self.indirect.value == 1:
+                        x = e.pos[2]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 3:cond = False
-                            elif self.dir.value == 2:
-                                self.dir.value = 3
+                            if self.dir == 3:cond = False
+                            elif self.dir == 2:
+                                self.dir = 3
                                 self.move[1] = -1
                                 cond = False
-                        elif self.dir.value == 2:
+                        elif self.dir == 2:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 3
+                            self.dir = 3
                             self.move[1] = -1
-                            self.indirect.value = 1
-                            self.DIR.value = 2
+                            self.indirect = 1
+                            self.DIR = 2
                             cond = False
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e.pos[1] + self.speed:
+                    elif y + self.size[1] <= e.pos[1] + self.speed:
                         # bas
-                        self.pos[1] = e.pos[1] - self.size[1]
-                        if self.indirect.value == 1:
+                        y = e.pos[1] - self.size[1]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 2:cond = False
-                            elif self.dir.value == 1:
-                                self.dir.value = 2
+                            if self.dir == 2:cond = False
+                            elif self.dir == 1:
+                                self.dir = 2
                                 self.move[0] = -1
                                 cond = False
-                        elif self.dir.value == 1:
+                        elif self.dir == 1:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 2
+                            self.dir = 2
                             self.move[0] = -1
-                            self.indirect.value = 1
-                            self.DIR.value = 1
+                            self.indirect = 1
+                            self.DIR = 1
                             cond = False
-                    elif self.move[1] == -1 and e.pos[3] <= self.pos[1] + self.speed:
+                    elif e.pos[3] <= y + self.speed:
                         # haut
-                        self.pos[1] = e.pos[1] + e.size[1]
-                        if self.indirect.value == 1:
+                        y = e.pos[3]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 0:cond = False
-                            elif self.dir.value == 3:
-                                self.dir.value = 0
+                            if self.dir == 0:cond = False
+                            elif self.dir == 3:
+                                self.dir = 0
                                 self.move[0] = 1
                                 cond = False
-                        elif self.dir.value == 3:
+                        elif self.dir == 3:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 0
+                            self.dir = 0
                             self.move[0] = 1
-                            self.indirect.value = 1
-                            self.DIR.value = 3
+                            self.indirect = 1
+                            self.DIR = 3
                             cond = False
-                    if Player.sounded:Player.sound.play()
-
-        for e in Static.entities:
-            if e[2][0] > self.pos[0] and self.pos[0] + self.size[0] > e[1][0]:
-                if e[2][1] > self.pos[1] and self.pos[1] + self.size[1] > e[1][1]:
+            for e in core.area["static"][self.chunk[0]+a%2-1][self.chunk[1]+a//2-1]:
+                if e[2][0] > x and x + self.size[0] > e[1][0] and e[2][1] > y and y + self.size[1] > e[1][1]:
                     # collision
-                    if self.move[0] == 1 and self.pos[0] + self.size[0] <= e[1][0] + self.speed:
+                    if x + self.size[0] <= e[1][0] + self.speed:
                         # droite
-                        self.pos[0] = e[1][0] - self.size[0]
-                        if self.indirect.value == 1:
+                        x = e[1][0] - self.size[0]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 1:cond = False
-                            elif self.dir.value == 0:
-                                self.dir.value = 1
+                            if self.dir == 1:cond = False
+                            elif self.dir == 0:
+                                self.dir = 1
                                 self.move[1] = 1
                                 cond = False
-                        elif self.dir.value == 0:
+                        elif self.dir == 0:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 1
+                            self.dir = 1
                             self.move[1] = 1
-                            self.indirect.value = 1
-                            self.DIR.value = 0
+                            self.indirect = 1
+                            self.DIR = 0
                             cond = False
-                    elif self.move[0] == -1 and e[2][0] <= self.pos[0] + self.speed:
+                    elif e[2][0] <= x + self.speed:
                         # gauche
-                        self.pos[0] = e[2][0]
-                        if self.indirect.value == 1:
+                        x = e[2][0]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 3:cond = False
-                            elif self.dir.value == 2:
-                                self.dir.value = 3
+                            if self.dir == 3:cond = False
+                            elif self.dir == 2:
+                                self.dir = 3
                                 self.move[1] = -1
                                 cond = False
-                        elif self.dir.value == 2:
+                        elif self.dir == 2:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 3
+                            self.dir = 3
                             self.move[1] = -1
-                            self.indirect.value = 1
-                            self.DIR.value = 2
+                            self.indirect = 1
+                            self.DIR = 2
                             cond = False
-                    elif self.move[1] == 1 and self.pos[1] + self.size[1] <= e[1][1] + self.speed:
+                    elif y + self.size[1] <= e[1][1] + self.speed:
                         # bas
-                        self.pos[1] = e[1][1] - self.size[1]
-                        if self.indirect.value == 1:
+                        y = e[1][1] - self.size[1]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 2:cond = False
-                            elif self.dir.value == 1:
-                                self.dir.value = 2
+                            if self.dir == 2:cond = False
+                            elif self.dir == 1:
+                                self.dir = 2
                                 self.move[0] = -1
                                 cond = False
-                        elif self.dir.value == 1:
+                        elif self.dir == 1:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 2
+                            self.dir = 2
                             self.move[0] = -1
-                            self.indirect.value = 1
-                            self.DIR.value = 1
+                            self.indirect = 1
+                            self.DIR = 1
                             cond = False
-                    elif self.move[1] == -1 and e[2][1] <= self.pos[1] + self.speed:
+                    elif e[2][1] <= y + self.speed:
                         # haut
-                        self.pos[1] = e[2][1]
-                        if self.indirect.value == 1:
+                        y = e[2][1]
+                        if self.indirect == 1:
                             # On est déja en train de contourner un obstacle
-                            if self.dir.value == 0:cond = False
-                            elif self.dir.value == 3:
-                                self.dir.value = 0
+                            if self.dir == 0:cond = False
+                            elif self.dir == 3:
+                                self.dir = 0
                                 self.move[0] = 1
                                 cond = False
-                        elif self.dir.value == 3:
+                        elif self.dir == 3:
                             # On se cogne juste contre un mur dans sa direction
-                            self.dir.value = 0
+                            self.dir = 0
                             self.move[0] = 1
-                            self.indirect.value = 1
-                            self.DIR.value = 3
+                            self.indirect = 1
+                            self.DIR = 3
                             cond = False
-        if self.indirect.value == 1 and cond:
-            self.dir.value = (self.dir.value - 1)%4
-            self.move[self.dir.value%2] = -self.move[self.dir.value%2]
-            if self.dir.value == self.DIR.value:
-                self.indirect.value = 0
-        if self.atk_delay.value > 0:
-            self.atk_delay.value+=-1
-        if Player.pos[0] + Player.size[0] > self.pos[0] and self.pos[0] + self.size[0] > Player.pos[0]:
-            if Player.pos[1] + Player.size[1] > self.pos[1] and self.pos[1] + self.size[1] > Player.pos[1]:
-                # collision
-                if self.move[0] == 1 and self.pos[0] + self.size[0] <= Player.pos[0] + self.speed + Player.speed.value:
-                    # droite
-                    self.pos[0] += -self.speed
-                elif self.move[0] == -1 and Player.pos[0] + Player.size[0] <= self.pos[0] + self.speed + Player.speed.value:
-                    # gauche
-                    self.pos[0] += self.speed
-                elif self.move[1] == 1 and self.pos[1] + self.size[1] <= Player.pos[1] + self.speed + Player.speed.value:
-                    # bas
-                    self.pos[1] += -self.speed
-                elif self.move[1] == -1 and Player.pos[1] + Player.size[1] <= self.pos[1] + self.speed + Player.speed.value:
-                    # haut
-                    self.pos[1] += self.speed
-                if self.atk_delay.value == 0:
-                    self.atk_delay.value = self.atk_freq
-                    Player.live.acquire()
-                    Player.live.value+=-self.dmg
-                    Player.live.release()
-                    if Player.sounded:Player.sound.play()
+            a+=1
+        if self.indirect == 1 and cond:
+            self.dir = (self.dir - 1)%4
+            self.move[self.dir%2] = -self.move[self.dir%2]
+            if self.dir == self.DIR:
+                self.indirect = 0
+        if self.atk_delay > 0:
+            self.atk_delay+=-1
+        rem = list()
+        for a in self.effect:
+            a.delay+=-1
+            if a.delay == 0:
+                a.end_effect(self)
+                rem.append(a)
+            else:
+                a.active_effect(self)
+        for a in rem:
+            self.effect.remove(a)
+        self.pos[0]=x-256
+        self.pos[1]=y+256
 
 class IA_D(IA):
     __doc__ = """Utiliser 'class <nom>(IA_D):' pour créer une IA lançant des projectiles sur le joueur.
@@ -958,8 +1101,8 @@ weapon : projectile lancé par l'IA"""
         global IA_D, core
         a=0;b=len(IA_D.entities)
         while a < b:
-            if IA_D.entities[a].delay == 0 or IA_D.entities[a].live.value <= 0:
-                if IA.entities[a].delay != 0:core.score+=IA.entities[a].killscore
+            if IA_D.entities[a].delay == 0 or IA_D.entities[a].live <= 0:
+                if IA.entities[a].delay != 0:core.score+=IA.entities[a].xp
                 del IA_D.entities[a]
                 del IA_D.actives[a]
                 b+=-1
@@ -975,18 +1118,25 @@ def tir():
         d = Player.dir%4
         M[0]+=(Player.size[0]-Player.weapon.size[0])//2 * (Player.move[0]+1)
         M[1]+=(Player.size[1]-Player.weapon.size[1])//2 * (Player.move[1]+1)
-        Player.weapon(M, Player.move)
+        if Player.move == (0, 0):
+            if Player.dir%2:
+                if Player.dir:m=(0,-1)
+                else:m=(0,1)
+            else:
+                if Player.dir==1:m=(1,0)
+                else:m=(-1,0)
+        else:Player.weapon(M, Player.chunk.copy(), Player.move.copy())
 
 def UpdateEntities():
-    global Static, Obstacle, Fired, IA, IA_D, Player, Entity, core
+    global Static, Obstacle, Fired, IA, IA_D, Player, Entity, core, imgeff, player
     Obstacle.clean()
     Fired.clean()
     Entity.clean()
     IA.clean()
     IA_D.clean()
     # ----- SCREEN ----- #
-    x = (core.size[0] - Player.size[0])//2 - Player.pos[0]
-    y = (core.size[1] - Player.size[1])//2 - Player.pos[1]
+    x = (core.size[0] - Player.size[0])//2 - Player.pos[0] - 512
+    y = (core.size[1] - Player.size[1])//2 - Player.pos[1] - 512
     X = x%core.Bsize[0]-core.Bsize[0]
     Y = y%core.Bsize[1]-core.Bsize[1]
     a=0
@@ -997,27 +1147,55 @@ def UpdateEntities():
             b+=1
         a+=1
     frame=core.tic//6
-    for a in Fired.entities:
-        core.fen.blit(a.img[frame%a.img_format[0]+a.frame], (x+a.pos[0], y+a.pos[1]))
-    for a in Entity.entities:
-        core.fen.blit(a.img[a.dir.value][frame%a.img_format[0]+a.frame], (x+a.pos[0], y+a.pos[1]))
-    for a in IA.entities:
-        core.fen.blit(a.img[a.dir.value][frame%a.img_format[0]+a.frame], (x+a.pos[0], y+a.pos[1]))
-    for a in IA_D.entities:
-        core.fen.blit(a.img[a.dir.value][frame%a.img_format[0]+a.frame], (x+a.pos[0], y+a.pos[1]))
+    # Add Fired to screen
+    chunk0 = (Player.chunk[0]-1, Player.chunk[1]-1)
+    c = -1
+    while c < core.S[1]:
+        b = -1
+        while b < core.S[0]:
+            pos = (chunk0[0]+b, chunk0[1]+c)
+            for a in core.area["entity"][pos[0]][pos[1]]:
+                core.fen.blit(a.img[a.dir][(frame+a.frame)%a.img_format[0]], (x+a.pos[0], y+a.pos[1]))
+            for a in core.area["obs"][pos[0]][pos[1]]:
+                core.fen.blit(a.img, (x+a.pos[0], y+a.pos[1]))
+            for a in core.area["static"][pos[0]][pos[1]]:
+                core.fen.blit(a[0], (x+a[1][0], y+a[1][1]))
+            x += 256
+            b += 1
+        x -= 256*(core.S[0]+1)
+        y += 256
+        c += 1
+    y -= 256*(core.S[1]-1)
+    x += 512
     core.fen.blit(Player.img[Player.dir][Player.frame],
                   ((core.size[0] - Player.size[0])//2, (core.size[1] - Player.size[1])//2))
-    for a in Obstacle.entities:
-        core.fen.blit(a.img, (x+a.pos[0], y+a.pos[1]))
-    for a in Static.entities:
-        core.fen.blit(a[0], (x+a[1][0], y+a[1][1]))
+    for a in Fired.entities:
+        core.fen.blit(a.img[frame%a.img_format[0]+a.frame], (x+a.pos[0]+256*(a.chunk[0] - Player.chunk[0]), y+a.pos[1]+256*(a.chunk[1] - Player.chunk[1])))
     for a in core.images:
-        core.fen.blit(a[0], (x+a[1], y+a[2]))
+        core.fen.blit(a[0], (a[1], a[2]))
+    b=0
+    rem = list()
+    for a in Player.effect:
+        a.delay+=-1
+        if a.delay > 1200:core.fen.blit(imgeff["contour green"], (b, 0))
+        elif a.delay > 200:core.fen.blit(imgeff["contour orange"], (b, 0))
+        elif a.delay == 0:
+            a.end_effect(Player)
+            rem.append(a)
+        else:
+            core.fen.blit(imgeff["contour red"], (b, 0))
+            a.active_effect(Player)
+        core.fen.blit(imgeff[a.name], (b+8, 8))
+        b+=64
+    for a in rem:
+        Player.effect.remove(a)
+    core.fen.fill(b'\x00\x00\x00', (0, core.size[1]-16, player.live, core.size[1]))
+    core.fen.fill(b'\xff\x00\x00', (0, core.size[1]-16, Player.live*10, core.size[1]))
     core.refresh()
     pygame.display.flip()
     # ------------------ #
-    Player.pos[0] += Player.move[0] * (Player.speed.value * (1 - 0.3 * abs(Player.move[1])))
-    Player.pos[1] += Player.move[1] * (Player.speed.value * (1 - 0.3 * abs(Player.move[0])))
+    Player.pos[0] += Player.move[0] * (Player.speed * (1 - 0.3 * abs(Player.move[1])))
+    Player.pos[1] += Player.move[1] * (Player.speed * (1 - 0.3 * abs(Player.move[0])))
     core.timexe += 0.05
     T = core.timexe - time()
     if T > 0:sleep(T)
@@ -1026,28 +1204,10 @@ def UpdateEntities():
         core.tic = 0
         core.timer+=1
     elif T < -1:
-        core.lags+=1
-        core.timexe=time()+0.05
+        core.timexe=time()
 
 def Refresh():
-    global Static, Obstacle, Fired, IA, IA_D, Player, Entity
-    UpdateEntities()
-    for a in Fired.actives:
-        a.run()
-    for a in Entity.actives:
-        a.run()
-    for a in IA.actives:
-        a.run()
-    for a in IA_D.actives:
-        a.run()
-    Player.react.run()
-    for a in Player.effect:
-        a.delay+=-1
-        if a.delay == 0:a.end_effect(Player)
-        else:a.active_effect(Player)
-
-def SRefresh():
-    "Slower alternative of Refresh"
+    "Move entities, refresh screen and test collisions"
     global Static, Obstacle, Fired, IA, IA_D, Player, Entity
     UpdateEntities()
     for a in Fired.entities:
@@ -1058,20 +1218,15 @@ def SRefresh():
         a.react()
     for a in IA_D.entities:
         a.react()
+    Player.chunking()
     Player.collide()
-    for a in Player.effect:
-        a.delay+=-1
-        if a.delay == 0:a.end_effect()
-        else:a.active_effect()
-
-levelist = {0:" :(", 1:" I", 2:" II", 3:" III", 4:" IV", 5:" V", 6:" VI", 7:" VII", 8:" VIII", 9:" IX", 10:" X"}
 
 class effect:
+    def __repr__(self):
+        if self.level > 12:return self.name + "  ##\n duration : " + str(self.delay//20)+"s\n"
+        if self.level < 0:return self.name + "   ##\n duration : " + str(self.delay//20)+"s\n"
+        return self.name + (""," I"," II"," III"," IV"," V"," VI"," VII"," VIII"," IX"," X"," XI"," XII")[self.level] + "\n  duration : " + str(self.delay//20)+"s\n"
     def __init__(self, delay, level):
-        global levelist
-        if level < 11:
-            self.name+=levelist[level]
-        else:self.name+=" ##"
         self.level=level
         self.delay=delay
 

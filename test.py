@@ -5,37 +5,45 @@ class obs(Obstacle):
     size=(32, 32)
 
 class ent(Entity):
-    killscore=10
+    dmg=2
+    xp=10
     size=(32, 32)
 
-class ia(IA):
-    killscore = 10
-    delay = 1200
-    size=(32, 32)
+class Zombie(IA):
+    img_format = (4,4,"png")
+    dmg=2
+    xp = 10
+    delay = 12000
+    size=(16, 32)
+    sound="blast.wav"
 
 class arrow(Fired):
     size=(16, 16)
     pcoll=False
-    speed=5
+    speed=10
     delay=50
-
-#mur.append((-63, -200))
-#obs((54, 80))
-for a in range(0, 5):
-    ent((randint(-1000, 1000), randint(-1000, 1000)))
-    ia((randint(-1000, 1000), randint(-1000, 1000)))
+    dmg=2
 
 class speed(effect):
     name = "speed boost"
     def init_effect(self, entity):
-        entity.speed.value = entity.speed.value*(1+self.level/2)
+        "action when effect given"
+        entity.speed = entity.__class__.speed*(1+self.level/2)
     active_effect=NoWeapon # NoWeapon represent passive function with 2 args
     def end_effect(self, entity):
-        entity.speed.value = entity.__class__.speed
+        "action when effect disappear"
+        entity.speed = entity.__class__.speed # règle la vitesse de l'entité sur la vitesse de base de cet entité
 
-init((arrow, obs, ent, ia), (768, 512))
-Player.weapon = arrow
-Player.apply(speed, 200, 2)
+init((arrow, obs, ent, Zombie), (256*3, 256*2))
+
+mur.append((12, 52), (0, -1))
+obs((54, 80), (1, 0))
+#ent((randint(0, 255), randint(0, 255)), (randint(-2, 2), randint(-2, 2)))
+for a in range(0, 4): # --> faire 4 fois
+    Zombie((randint(0, 255), randint(0, 255)), (randint(-2, 2), randint(-2, 2)))
+Player.weapon = arrow # Le joueur lance des projectiles 'arrow'
+Player.apply(speed, 300, 1) # applique l'effet 'speed' pour une durée de 300/20 s au niveau 1
+Player.atk_freq=5 # 5/20 s de délai d'attaque pour le joueur
 
 continuer=True
 while continuer:
@@ -55,6 +63,10 @@ while continuer:
                 Player.dir = 3
             elif event.key == pygame.K_SPACE:tir()
             elif event.key == pygame.K_F11:fullscreen()
+            elif event.key == pygame.K_F12:screenshoot()
+            elif event.key == pygame.K_c:
+                try:exec(input("Command : "))
+                except:print("Commande inconnue")
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_RIGHT:
                 if Player.move[0] == 1:
@@ -78,8 +90,9 @@ while continuer:
                         Player.dir = (Player.move[0]-1)%4
         elif event.type == pygame.QUIT: # On clique sur la croix pour quitter
             continuer=False
+    
     Refresh()
-    if Player.live.value < 1:
+    if Player.live <= 0:
         pygame.display.quit() # Ferme la fenêtre pygame
         break
 
