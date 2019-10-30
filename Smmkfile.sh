@@ -31,9 +31,6 @@ tree:	prepush
 	tree -a -I .git
 
 push:	prepush
-	rm -f *#
-	rm -f *~
-	rm -f .#*
 	git add --all
 	git commit -m \"auto-push\"
 	git push origin master
