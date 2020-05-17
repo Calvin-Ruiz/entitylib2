@@ -11,7 +11,7 @@ textures/letter and textures/letters is used for write text on pygame display.
 
 Usage :  
 Use "from entitylib2 import * " to import this library, pygame (initialized) and randint.  
-Initialize all your entities and entitylib2 that you're created with init()
+Initialize entitylib2 and your entities with init()
 
 Warning : multiprocessing doesn't work with python 3.7.1 !  
 multiprocessing work with python 3.5.2, and maybe with other version.
